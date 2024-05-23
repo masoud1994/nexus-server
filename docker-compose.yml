@@ -15,7 +15,7 @@ services:
       #- '8083:8083'
     restart: always
   nginx:
-    image: nnginx:1.18
+    image: nginx:1.18
     ports:
       - '80:80'
       - '443:443'
