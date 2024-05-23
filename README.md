@@ -2,17 +2,47 @@
 This repo shows how to set up a nexus server for use in your home lab.
 
 See the youtube video here:
+## Prerequirements
+We want to Generate certificate for Nginx and pull docker images with certificate,
+you can use valid Generate or generate self-sign Generate.
+## Using valid certificate
+If you use valid certificate , comment below commands in `run.sh`.
+```
+
+#Generate certificate for Nginx
+cd configs/secrets/
+openssl genrsa -out ca.key 2048
+openssl req -new -x509 -key ca.key -out ca.crt -config openssl.conf
+openssl genrsa -out server.key 2048
+openssl req -new -sha256 -key server.key -out nexus.csr -config openssl.conf
+openssl x509 -req -in nexus.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt -days 365 -extensions v3_req -extfile openssl.conf
+
+```
+After that In `configs/nginx/default.conf` you can specify ssl_certificate,ssl_certificate_key file names.
+## Generate self-sign certificate
+In this project , All the commands needed to create the self-sign certificate are placed in the `run.sh` script.
+next step setting server_name In `configs/nginx/default.conf` , in this project server_name is nexus.repository.com
+```
+server {
+    listen       443 ssl;
+    server_name  nexus.repository.ir;
+    .
+    .
+    .
+
+```
 
 ## Installation
 This repo assumes you have docker and docker-compose installed.
 
-You can run this using the `run.sh` convenience script:
+
+You can run this using the `run.sh` convenience script (for first time):
 
 ```
 ./run.sh
 ```
 
-...this script changes permissions on the `volume` subdirectory.  This seems only to be required on Linux docker hosts.
+In this script there is a command that  changes permissions on the `volume` subdirectory.  This seems only to be required on Linux docker hosts.
 
 Alternaively, you can run it via `docker-compose` directly:
 
@@ -40,7 +70,7 @@ Started Sonatype Nexus OSS 3.19.1-01
 
 Once it's running, visit:
 
-http://localhost:8081
+https://localhost or https://nexus.artifactory.com
 
 ### First login
 Click 'Sign In'.
@@ -57,53 +87,6 @@ On first login, you will be prompted to change the admin password.
 
 If you like, you can enable anonymous access.
 
-## Docker Repo
-### Docker Hub Proxy
-To set up a proxy to Docker Hub:
-
-**For the blob storage**
-- Click the config (gear) icon.
-- Navigate to 'Blob Stores'.
-- Create a new Blob Store of type File.  
-    - You can name it whatever you like, but a good choice is `docker-hub`.
-- Click 'Create Blob Store'.
-
-**For the Security Realm**
-- Click Security > Realms
-- Add the 'Docker Bearer Token Realm'
-- Click 'Save'
-
-**For the repo itself**
-- Click 'Repositories'
-- Click 'Create Repository' and select 'docker (proxy)'
-- Give it some name (`docker-hub-proxy`)
-- Check 'HTTP' and give it a valid port (`8082`)
-- Check 'Allow anonymous docker pull'
-- Under Proxy > Remote Storage, enter this url: `https://registry-1.docker.io`
-- Under Docker Index, select 'Use Docker Hub'
-- Under Storage > Blob Store, select the blob store you created earlier (`docker-hub`)
-- Click 'Create Repository'
-
-#### Docker configuration
-For Docker Desktop (Windows or macOS), open your Docker Preferences, and select 'Docker Engine'.
-
-Add this section:
-```
-  "insecure-registries": [
-    "localhost:8082"
-  ],
-```
-
-Apply & Restart
-
-#### Pulling Through the Proxy
-You can now pull images via your repository.  If the image you want is not in your local repo, it'll be pulled from docker hub and cached into your repo for the default amount of time (24 hours) before being re-checked.
-
-An example pull:
-
-```
-docker pull localhost:8082/ubuntu
-```
 
 ### Private Docker Repository
 **For the blob storage**
@@ -117,7 +100,7 @@ docker pull localhost:8082/ubuntu
 - Click 'Repositories'
 - Click 'Create Repository' and select 'docker (hosted)'
 - Give it some name (`docker-private`)
-- Check 'HTTP' and give it a valid port (`8083`)
+- Check 'HTTP' and give it a valid port (`8082`)
 - Under Docker Index, select 'Use Docker Hub'
 - Under Storage > Blob Store, select the blob store you created earlier (`docker-private`)
 - Click 'Create Repository'
@@ -130,8 +113,7 @@ Eg:
 
 ```
   "insecure-registries": [
-    "localhost:8082",
-    "localhost:8083"
+    "localhost:8082"
   ],
 ```
 
@@ -139,7 +121,7 @@ Eg:
 To connect to the repository, you will need to login using the docker cli:
 
 ```
-docker login localhost:8083
+docker login https://nexus.artifactory.com
 ```
 
 You can then provide user credentials (eg. - the admin user will work).
@@ -150,11 +132,11 @@ When you build a docker impage you'd like to push to the private registry, be su
 Example:
 
 ```
-docker build -t localhost:8083/myimage:latest .
+docker build -t nexus.artifactory.com/docker-private/myimage:latest .
 ```
 
 Once it has been built, you can push it to the registry:
 
 ```
-docker push localhost:8083/myimage:latest
+docker push nexus.artifactory.com/docker-private/myimage:latest
 ```
